@@ -199,7 +199,7 @@ class Player {
   static Integer ourGrowMineIdMethod(List<Site> sites, int qX, int qY) {
     try {
       List<Site> tmp = sites.stream()
-          .filter(site -> site.isOurs && site.structureType == 0 && site.param1 <= site.maxMineSize && dist(qX, qY, site.x, site.y) < 300)
+          .filter(site -> site.isOurs && site.structureType == 0 && site.param1 < site.maxMineSize && dist(qX, qY, site.x, site.y) < 300)
           .collect(Collectors.toList());
       return closestSiteId(tmp, qX, qY);
     } catch (Exception e) {
