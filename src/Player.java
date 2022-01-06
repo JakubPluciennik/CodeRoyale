@@ -12,14 +12,19 @@ class Site {
   final int x;
   final int y;
   final int radius;
+  int goldRemaining = 0;
+  int maxMineSize = 0;
+
   Integer structureType;
   Boolean isOurs = true;
   int param1;
+  int param2;
+
 
   @Override
   public String toString() {
     return "Site{ siteId: " + siteId + "| isOurs: " + isOurs + "| x: " + x + "| y: " + y + "| radius: " + radius + "| type: " + structureType +
-        "| param1: " + param1 + "}";
+        "| param1: " + param1 + "}\n";
   }
 
   public Site(int siteId, int x, int y, int radius) {
@@ -70,9 +75,9 @@ class Player {
       int touchedSite = in.nextInt(); // -1 if none
       for (int i = 0; i < numSites; i++) {
         int siteId = in.nextInt();
-        int ignore1 = in.nextInt(); // used in future leagues
-        int ignore2 = in.nextInt(); // used in future leagues
-        int structureType = in.nextInt(); // -1 = No structure, 1 = Tower, 2 = Barracks
+        int goldRemaining = in.nextInt(); // -1 if unknown
+        int maxMineSize = in.nextInt(); // -1 if unknown
+        int structureType = in.nextInt(); // -1 = No structure, 0 = Goldmine, 1 = Tower, 2 = Barracks
         int owner = in.nextInt(); // -1 = No structure, 0 = Friendly, 1 = Enemy
         int param1 = in.nextInt();
         int param2 = in.nextInt();
@@ -87,8 +92,12 @@ class Player {
               } else {
                 site.structureType = structureType;
               }
+              site.goldRemaining = goldRemaining;
+              site.maxMineSize = maxMineSize;
+
               site.isOurs = owner == 0;
               site.param1 = param1;
+              site.param2 = param2;
             });
       }
       int numUnits = in.nextInt();
@@ -103,7 +112,7 @@ class Player {
         int unitType = in.nextInt(); // -1 = QUEEN, 0 = KNIGHT, 1 = ARCHER, 2 = GIANT
         int health = in.nextInt();
 
-        //współrzędne naszej królowej
+        //współrzędne tymczasowe naszej królowej
         if (owner == 0 && unitType == -1) {
           tmpX = x;
           tmpY = y;
@@ -111,79 +120,31 @@ class Player {
         units.add(new Unit(x, y, owner == 0, unitType, health));
       }
 
-      System.err.println(sites);
+      //współrzędnie finalne królowej
       final int qY = tmpY;
       final int qX = tmpX;
-      Integer ourBarrackId;
-      try {
-        ourBarrackId = sites.stream()
-            .filter(site -> site.isOurs && site.structureType == 2)
-            .collect(Collectors.toList())
-            .get(0).siteId;
 
-      } catch (Exception e) {
-        ourBarrackId = null;
-      }
-      //////////////
+      //id baraku
+      Integer ourBarrackId = ourBarrackIdMethod(sites);
       System.err.println("barrack id: " + ourBarrackId);
 
-      Integer ourClosestTowerId;
-      try {
-        ourClosestTowerId = sites.stream()
-            .filter(site -> site.isOurs && site.structureType == 1 && site.param1 < 400)
-            .collect(Collectors.toList())
-            .get(0).siteId;
+      //rozwijanie wieży
+      Integer ourGrowTowerId = ourGrowTowerIdMethod(sites, qX, qY);
+      System.err.println("growing tower id: " + ourGrowTowerId);
 
-      } catch (Exception e) {
-        ourClosestTowerId = null;
-      }
-      System.err.println("closest tower id: " + ourClosestTowerId);
+      //rozwijanie kopalni
+      Integer ourGrowMineId = ourGrowMineIdMethod(sites, qX, qY);
+      System.err.println("growing mine id: " + ourGrowMineId);
 
-      //zostawienie sites które nie mają budowli
-      List<Site> closestSites = sites.stream()
-          .filter(site -> site.structureType == null)
-          .collect(Collectors.toList());
+      //najbliższe puste miejsce
+      int closestId = closestNullIdMethod(sites, qX, qY);
+      System.err.println("closest id: " + closestId);
 
-      int closestId = 0;
-      // znalezienie najbliższego miejsca
-      try {
-        double min = minDist(qX, qY, closestSites.get(0).x, closestSites.get(0).y);
-        for (Site s : closestSites) {
-          double tmp = minDist(qX, qY, s.x, s.y);
-          if (tmp < min) {
-            closestId = s.siteId;
-            min = tmp;
-          }
-        }
-        System.err.println("closest Id: " + closestId);  //siteId najbliższego miejsca
+      //dochód z kopalni
+      int ourIncome = ourIncomeMethod(sites);
+      System.err.println("income: " + ourIncome);
 
-      } catch (Exception e) { //wszystkie sites nie puste
-        closestId = 0; //brak najbliższego pustego
-      }
-
-      /*  ukrycie w kącie i atakowanie jedną wieżą
-        int targetX;
-        int targetY;
-        if (qX < 1920 / 2) targetX = 0;
-         else targetX = 1920;
-
-        if (qY < 1000 / 2) targetY = 0;
-         else targetY = 1000;
-
-        System.out.println("MOVE "+ targetX+" "+targetY);
-        System.out.println("TRAIN " + ourBarrackId);
-        */
-
-
-      if (ourClosestTowerId != null) {
-        System.out.println("BUILD " + ourClosestTowerId + " TOWER");
-      } else {
-        if (ourBarrackId == null) {
-          System.out.println("BUILD " + closestId + " BARRACKS-KNIGHT");
-        } else {
-          System.out.println("BUILD " + closestId + " TOWER");
-        }
-      }
+      System.out.println(getQueenAction(ourGrowTowerId, ourBarrackId, closestId, ourIncome, ourGrowMineId));
 
       if (ourBarrackId != null) {
         System.out.println("TRAIN " + ourBarrackId);
@@ -193,9 +154,101 @@ class Player {
     }
   }
 
-  static double minDist(int x1, int y1, int x2, int y2) {
+  private static int ourIncomeMethod(List<Site> sites) {
+    int ourIncome = 0;
+    try {
+      List<Site> incomeSites = sites.stream()
+          .filter(site -> site.isOurs && site.structureType == 0)
+          .collect(Collectors.toList());
+      for (Site s : incomeSites) {
+        ourIncome += s.param1;
+      }
+      return ourIncome;
+    } catch (Exception e) {
+      return 0;
+    }
+  }
+
+  static int closestNullIdMethod(List<Site> sites, int qX, int qY) {
+    //zostawienie sites które nie mają budowli
+    List<Site> closestSites = sites.stream()
+        .filter(site -> site.structureType == null)
+        .collect(Collectors.toList());
+
+    // znalezienie najbliższego miejsca
+    try {
+      return closestSiteId(closestSites, qX, qY);
+    } catch (Exception e) { //wszystkie sites nie puste
+      return 0; //brak najbliższego pustego
+    }
+  }
+
+  static int closestSiteId(List<Site> sites, int qX, int qY) throws Exception {
+    int closest = sites.get(0).siteId;
+    double min = dist(qX, qY, sites.get(0).x, sites.get(0).y);
+    for (Site s : sites) {
+      double tmp = dist(qX, qY, s.x, s.y);
+      if (tmp < min) {
+        closest = s.siteId;
+        min = tmp;
+      }
+    }
+    return closest;
+  }
+
+  static Integer ourGrowMineIdMethod(List<Site> sites, int qX, int qY) {
+    try {
+      List<Site> tmp = sites.stream()
+          .filter(site -> site.isOurs && site.structureType == 0 && site.param1 <= site.maxMineSize && dist(qX, qY, site.x, site.y) < 300)
+          .collect(Collectors.toList());
+      return closestSiteId(tmp, qX, qY);
+    } catch (Exception e) {
+      return null;
+    }
+  }
+
+  static Integer ourBarrackIdMethod(List<Site> sites) {
+    try {
+      return sites.stream()
+          .filter(site -> site.isOurs && site.structureType == 2)
+          .collect(Collectors.toList())
+          .get(0).siteId;
+    } catch (Exception e) {
+      return null;
+    }
+  }
+
+  static Integer ourGrowTowerIdMethod(List<Site> sites, int qX, int qY) {
+    try {
+      List<Site> tmp = sites.stream()
+          .filter(site -> site.isOurs && site.structureType == 1 && site.param1 < 350 && dist(qX, qY, site.x, site.y) < 300)
+          .collect(Collectors.toList());
+
+      return closestSiteId(tmp, qX, qY);
+    } catch (Exception e) {
+      return null;
+    }
+  }
+
+  static double dist(int x1, int y1, int x2, int y2) {
     int dx = x1 - x2;
     int dy = y1 - y2;
     return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  static String getQueenAction(Integer ourGrowTowerId, Integer ourBarrackId, int closestId, Integer ourIncome, Integer ourGrowMineId) {
+    if (ourGrowTowerId != null) {
+      return "BUILD " + ourGrowTowerId + " TOWER";
+    }
+    if (ourGrowMineId != null) {
+      return "BUILD " + ourGrowMineId + " MINE";
+    }
+    if (ourIncome < 5) {
+      return "BUILD " + closestId + " MINE";
+    }
+    if (ourBarrackId == null) {
+      return "BUILD " + closestId + " BARRACKS-KNIGHT";
+    }
+    return "BUILD " + closestId + " TOWER";
   }
 }
