@@ -361,6 +361,20 @@ class Player {
     }
   }
 
+  static Site closestAnyMethod(List<Site> sites, final int x, final int y) {
+    try {
+      List<Site> closestNonBarrack = sites.stream()
+          .filter(site -> site.structureType == null || (site.structureType == 0))
+          .collect(Collectors.toList());
+      return closestNonBarrack.stream()
+          .filter(site -> site.id == closestSiteId(closestNonBarrack, x, y))
+          .collect(Collectors.toList())
+          .get(0);
+    } catch (Exception e) {
+      return null;
+    }
+  }
+
   static double dist(int x1, int y1, int x2, int y2) {
     return Math.sqrt((x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2));
   }
@@ -393,6 +407,9 @@ class Player {
       closest = closestNullIdMethod(sites, q.x, q.y);
     }
 
+    Site closestAny = closestAnyMethod(sites, q.x, q.y);
+    System.err.println("closest any: " + closestAny);
+
     //System.err.println("closest id: " + closest.id);
 
     //jeśli rycerze wroga blisko, to w niebezpieczeństwie
@@ -415,12 +432,13 @@ class Player {
       startingTargetY = startingY - 500;
     }
     int targetIncome = 10;
-    if (q.health < 30) {  //budowa Baraku blisko środka
+    if (q.health < 50) {
       targetIncome = 5;
     }
     if (enemyClosestTower != null && dist(q.x, q.y, enemyClosestTower.x, enemyClosestTower.y) < 100) {
       return "BUILD " + enemyClosestTower.id + " TOWER";
     }
+
     if (closest == null) {
       if (ourGrowTowerId != null) {
         return "BUILD " + ourGrowTowerId + " TOWER";
@@ -433,13 +451,9 @@ class Player {
         return "BUILD " + ourClosestTower.id + " TOWER";
       }
     }
-
     System.err.println("enemy barrack: " + enemyBarrack);
     if (gold > 160 && ourKnightBarrack.isEmpty()) {
       return "BUILD " + closest.id + " BARRACKS-KNIGHT";
-    }
-    if (numberOfEnemyTowers > 3 && ourGiantBarrack.isEmpty()) {
-      return "BUILD " + closest.id + " BARRACKS-GIANT";
     }
 //    if (enemyBarrack && ourArcherBarrack.isEmpty()) {
 //      return "BUILD " + closest.id + " BARRACKS-ARCHER";
@@ -448,6 +462,9 @@ class Player {
       if (ourKnightBarrack.isEmpty()) {
         return "BUILD " + closestSiteId(sites, q.x, q.y) + " BARRACKS-KNIGHT";
       }
+      if (ourGrowTowerId != null) {
+        return "BUILD " + ourGrowTowerId + " TOWER";
+      }
       if (numberOfFriendlyTowers <= 3) {
         if (dist(q.x, q.y, closest.x, closest.y) < closest.radius + 90) {
           return "BUILD " + closest.id + " TOWER";
@@ -455,22 +472,27 @@ class Player {
         if (dist(startingX, startingTargetY, closest.x, closest.y) < 200) {
           return "BUILD " + closest.id + " TOWER";
         }
-        if (ourClosestTower != null && ourGrowTowerId != null && ourClosestTower.id == ourGrowTowerId &&
-            dist(q.x, q.y, ourClosestTower.x, ourClosestTower.y) < ourClosestTower.radius + 90) {
-          return "BUILD " + ourGrowTowerId + " TOWER";
+        if (ourClosestTower != null && ourClosestTower.param2 < 500 && dist(startingX, startingTargetY, ourClosestTower.x, ourClosestTower.y) < 200) {
+          return "BUILD " + ourClosestTower.id + " TOWER";
         }
-        return "MOVE " + startingX + " " + startingTargetY;
 
+        return "MOVE " + startingX + " " + startingTargetY;
       }
-      if (ourGrowTowerId != null) {
-        return "BUILD " + ourGrowTowerId + " TOWER";
-      }
-      if (dist(q.x, q.y, closest.x, closest.y) < closest.radius + 60) {
+
+      if (dist(q.x, q.y, closest.x, closest.y) < closest.radius + 70) {
         return "BUILD " + closest.id + " TOWER";
       }
       return "BUILD " + closest.id + " TOWER";
     }
-
+    if (numberOfEnemyTowers > 3 && ourGiantBarrack.isEmpty()) {
+      return "BUILD " + closest.id + " BARRACKS-GIANT";
+    }
+    if (ourIncome <= targetIncome && ourGrowMineId != null) {
+      return "BUILD " + ourGrowMineId + " MINE";
+    }
+    if (ourIncome <= targetIncome && mineCandidate != null) {
+      return "BUILD " + mineCandidate + " MINE";
+    }
     if (enemyClosestTower != null) {
       int dx = q.x - enemyClosestTower.x;
       int dy = q.y - enemyClosestTower.y;
@@ -483,20 +505,16 @@ class Player {
       }
       return "MOVE " + targetX + " " + targetY;
     }
-
+    if (ourGrowTowerId != null) {
+      return "BUILD " + ourGrowTowerId + " TOWER";
+    }
     if (ourGrowMineId != null) {
       return "BUILD " + ourGrowMineId + " MINE";
     }
 
-    if (ourIncome <= targetIncome && mineCandidate != null) {
-      return "BUILD " + mineCandidate + " MINE";
-    }
 
     if (ourKnightBarrack.isEmpty()) {
       return "BUILD " + closest.id + " BARRACKS-KNIGHT";
-    }
-    if (ourGrowTowerId != null) {
-      return "BUILD " + ourGrowTowerId + " TOWER";
     }
 
     return "BUILD " + closest.id + " TOWER";
