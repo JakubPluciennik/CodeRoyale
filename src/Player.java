@@ -34,11 +34,14 @@ class Site {
   int param1;
   int param2;
 
+  boolean isAccessible = true;
+  int Atimer = 0;
+
 
   @Override
   public String toString() {
     return "Site{ sID: " + id + "| Our: " + isOurs + "| x: " + x + "| y: " + y + "| r: " + radius + "| type: " + structureType + "| p1: " + param1 +
-        "| p2: " + param2 + "| rG: " + goldRemaining + "}\n";
+        "| p2: " + param2 + "| rG: " + goldRemaining + "| Access: " + isAccessible + "| At: " + Atimer + "}\n";
   }
 
   public Site(int id, int x, int y, int radius) {
@@ -127,6 +130,14 @@ class Player {
               site.isOurs = owner == 0;
               site.param1 = param1;
               site.param2 = param2;
+
+              if (!site.isAccessible) {
+                if (site.Atimer > 0) {
+                  site.Atimer--;
+                } else {
+                  site.isAccessible = true;
+                }
+              }
             });
 
         if (structureType == 0 && owner == 0) { //dochód z kopalni
@@ -262,7 +273,7 @@ class Player {
   static Site closestNullIdMethod(List<Site> sites, final int x, final int y) {
     //zostawienie sites które nie mają budowli
     List<Site> closestSites = sites.stream()
-        .filter(site -> site.structureType == null)
+        .filter(site -> site.isAccessible && site.structureType == null)
         .collect(Collectors.toList());
 
     // znalezienie najbliższego miejsca
@@ -275,7 +286,7 @@ class Player {
   private static Site closestTowerIdMethod(List<Site> sites, final int x, final int y, boolean isOurs) {
     try {
       List<Site> towerSites = sites.stream()
-          .filter(site -> site.structureType != null && site.structureType == 1 && site.isOurs == isOurs)
+          .filter(site -> site.isAccessible && site.structureType != null && site.structureType == 1 && site.isOurs == isOurs)
           .collect(Collectors.toList());
       return towerSites.stream()
           .filter(site -> site.id == closestSiteId(towerSites, x, y))
@@ -321,7 +332,7 @@ class Player {
   static Integer ourGrowMineIdMethod(List<Site> sites, final int x, final int y) {
     try {
       List<Site> tmp = sites.stream()
-          .filter(site -> site.isOurs && site.structureType == 0 && site.param1 < site.maxMineSize && dist(x, y, site.x, site.y) < 300)
+          .filter(site -> site.isOurs && site.isAccessible && site.structureType == 0 && site.param1 < site.maxMineSize && dist(x, y, site.x, site.y) < 300)
           .collect(Collectors.toList());
       return closestSiteId(tmp, x, y);
     } catch (Exception e) {
@@ -331,7 +342,7 @@ class Player {
 
   private static Integer closestMineCandidateId(List<Site> sites, final int x, final int y) {
     List<Site> mineCandidates = sites.stream()
-        .filter(site -> site.structureType == null && site.goldRemaining > 0)
+        .filter(site -> site.isAccessible && site.structureType == null && site.goldRemaining > 0)
         .collect(Collectors.toList());
     System.err.println(mineCandidates);
 
@@ -341,7 +352,7 @@ class Player {
   static Integer ourGrowTowerIdMethod(List<Site> sites, final int x, final int y) {
     try {
       List<Site> tmp = sites.stream()
-          .filter(site -> site.isOurs && site.structureType == 1 && site.param1 < 500 && dist(x, y, site.x, site.y) < 300)
+          .filter(site ->  site.isOurs && site.isAccessible && site.structureType == 1 && site.param1 < 500 && dist(x, y, site.x, site.y) < 300)
           .collect(Collectors.toList());
 
       return closestSiteId(tmp, x, y);
@@ -380,7 +391,7 @@ class Player {
   }
 
   private static Unit dangerousEnemyCreepMethod(List<Unit> units, Queen q) {
-    int dangerZone = (750 - q.health * 7) + 200;
+    int dangerZone = (700 - q.health * 7) + 200;
     try {
       return units.stream()
           .filter(unit -> !unit.isMine && dist(q.x, q.y, unit.x, unit.y) < dangerZone)
@@ -435,9 +446,6 @@ class Player {
     if (q.health < 50) {
       targetIncome = 5;
     }
-    if (enemyClosestTower != null && dist(q.x, q.y, enemyClosestTower.x, enemyClosestTower.y) < 100) {
-      return "BUILD " + enemyClosestTower.id + " TOWER";
-    }
 
     if (closest == null) {
       if (ourGrowTowerId != null) {
@@ -482,7 +490,7 @@ class Player {
       if (dist(q.x, q.y, closest.x, closest.y) < closest.radius + 70) {
         return "BUILD " + closest.id + " TOWER";
       }
-      return "BUILD " + closest.id + " TOWER";
+      return "MOVE " + startingX + " " + startingTargetY;
     }
     if (numberOfEnemyTowers > 3 && ourGiantBarrack.isEmpty()) {
       return "BUILD " + closest.id + " BARRACKS-GIANT";
@@ -503,6 +511,8 @@ class Player {
       if (dist(q.x, q.y, closest.x, closest.y) < closest.radius + 90) {
         return "BUILD " + closest.id + " TOWER";
       }
+      closest.isAccessible = false;
+      closest.Atimer = 15;
       return "MOVE " + targetX + " " + targetY;
     }
     if (ourGrowTowerId != null) {
