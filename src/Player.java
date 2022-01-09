@@ -221,21 +221,19 @@ class Player {
 
       String action = "WAIT";
 
-      if (q != null) {
-        action =
-            queenAction(sites, units, q, ourKnightBarrack, ourArcherBarrack, ourIncome, numberOfEnemyTowers, numberOfFriendlyTowers, ourGiantBarrack,
-                knightUnits, enemyUnits, gold, touchedSite, numberOfFriendlyMines, archerUnits, enemyBarrack);
+      try {
+        if (q != null) {
+          action = queenAction(sites, units, q, ourKnightBarrack, ourArcherBarrack, ourIncome, numberOfEnemyTowers, numberOfFriendlyTowers,
+              ourGiantBarrack, knightUnits, enemyUnits, gold, touchedSite, numberOfFriendlyMines, archerUnits, enemyBarrack);
+        }
+      } catch (Exception e) {
+        action = "WAIT";
       }
 
 
       String train = "TRAIN";
       Site readyBarrack = readyBarrack(sites);
-      System.err.println("our archer barracks: " + ourArcherBarrack);
 
-
-//      if (enemyUnits > 2 && !ourArcherBarrack.isEmpty()) {
-//        train += " " + ourArcherBarrack.get(0).id;
-//      } else
       if (numberOfEnemyTowers > 2 && !ourGiantBarrack.isEmpty() && giantUnits == 0) {
         train += " " + ourGiantBarrack.get(0).id;
       } else if (readyBarrack != null && readyBarrack.param2 == 0) {
@@ -332,7 +330,8 @@ class Player {
   static Integer ourGrowMineIdMethod(List<Site> sites, final int x, final int y) {
     try {
       List<Site> tmp = sites.stream()
-          .filter(site -> site.isOurs && site.isAccessible && site.structureType == 0 && site.param1 < site.maxMineSize && dist(x, y, site.x, site.y) < 300)
+          .filter(site -> site.isOurs && site.isAccessible && site.structureType == 0 && site.param1 < site.maxMineSize &&
+              dist(x, y, site.x, site.y) < 300)
           .collect(Collectors.toList());
       return closestSiteId(tmp, x, y);
     } catch (Exception e) {
@@ -352,7 +351,7 @@ class Player {
   static Integer ourGrowTowerIdMethod(List<Site> sites, final int x, final int y) {
     try {
       List<Site> tmp = sites.stream()
-          .filter(site ->  site.isOurs && site.isAccessible && site.structureType == 1 && site.param1 < 500 && dist(x, y, site.x, site.y) < 300)
+          .filter(site -> site.isOurs && site.isAccessible && site.structureType == 1 && site.param1 < 500 && dist(x, y, site.x, site.y) < 300)
           .collect(Collectors.toList());
 
       return closestSiteId(tmp, x, y);
@@ -411,7 +410,6 @@ class Player {
 
     //rozwijanie kopalni
     Integer ourGrowMineId = ourGrowMineIdMethod(sites, q.x, q.y);
-    System.err.println("growing mine id: " + ourGrowMineId);
     Site closest = null;
     //najbliższe puste miejsce
     if (closestNullIdMethod(sites, q.x, q.y) != null) {
@@ -419,13 +417,11 @@ class Player {
     }
 
     Site closestAny = closestAnyMethod(sites, q.x, q.y);
-    System.err.println("closest any: " + closestAny);
 
     //System.err.println("closest id: " + closest.id);
 
     //jeśli rycerze wroga blisko, to w niebezpieczeństwie
     boolean inDanger = inDangerMethod(units, q);
-    System.err.println("in danger: " + inDanger);
 
     //jednostka wroga w niebezpiecznym polu
     Unit dangerousEnemyCreep = dangerousEnemyCreepMethod(units, q);
@@ -436,8 +432,10 @@ class Player {
     //wroga wieża w zasięgu
     Site enemyClosestTower = closestEnemyTowerMethod(sites, q);
 
-
     Integer mineCandidate = closestMineCandidateId(sites, q.x, q.y);
+
+    //-----LOGIKA GRY-----
+
     int startingTargetY = startingY + 500;
     if (startingY > 500) {
       startingTargetY = startingY - 500;
@@ -446,7 +444,6 @@ class Player {
     if (q.health < 50) {
       targetIncome = 5;
     }
-
     if (closest == null) {
       if (ourGrowTowerId != null) {
         return "BUILD " + ourGrowTowerId + " TOWER";
@@ -463,9 +460,6 @@ class Player {
     if (gold > 160 && ourKnightBarrack.isEmpty()) {
       return "BUILD " + closest.id + " BARRACKS-KNIGHT";
     }
-//    if (enemyBarrack && ourArcherBarrack.isEmpty()) {
-//      return "BUILD " + closest.id + " BARRACKS-ARCHER";
-//    }
     if (dangerousEnemyCreep != null) {
       if (ourKnightBarrack.isEmpty()) {
         return "BUILD " + closestSiteId(sites, q.x, q.y) + " BARRACKS-KNIGHT";
@@ -483,7 +477,6 @@ class Player {
         if (ourClosestTower != null && ourClosestTower.param2 < 500 && dist(startingX, startingTargetY, ourClosestTower.x, ourClosestTower.y) < 200) {
           return "BUILD " + ourClosestTower.id + " TOWER";
         }
-
         return "MOVE " + startingX + " " + startingTargetY;
       }
 
@@ -521,12 +514,9 @@ class Player {
     if (ourGrowMineId != null) {
       return "BUILD " + ourGrowMineId + " MINE";
     }
-
-
     if (ourKnightBarrack.isEmpty()) {
       return "BUILD " + closest.id + " BARRACKS-KNIGHT";
     }
-
     return "BUILD " + closest.id + " TOWER";
   }
 }
